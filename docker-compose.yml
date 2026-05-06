@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: builder
+    ports:
+      - "8080:8080"
+
+  app-final:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    ports:
+      - "8081:8080"

@@ -1,0 +1,27 @@
+FROM golang:1.21 AS ci
+WORKDIR /build
+COPY app/go.mod app/go.sum ./
+RUN go mod download
+COPY app/* .
+RUN go mod verify
+RUN CGO_ENABLED=0 GOOS=linux go test -v ./...
+
+FROM golang:1.21 AS builder
+WORKDIR /build
+COPY --from=ci /build/go.mod /build/go.sum ./
+RUN go mod download
+COPY app/* .
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w -extldflags '-static'" \
+    -o myapp .
+
+FROM alpine:latest AS security
+RUN apk add --no-cache trivy
+COPY --from=builder /build/myapp /myapp
+RUN trivy filesystem --no-progress --exit-code 0 --severity HIGH,CRITICAL /
+
+FROM scratch
+COPY --from=builder /build/myapp /myapp
+COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+EXPOSE 8080
+ENTRYPOINT ["/myapp"]
